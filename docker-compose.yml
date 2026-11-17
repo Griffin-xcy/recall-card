@@ -1,0 +1,16 @@
+services:
+  recall-card:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      BASE_URL: ${BASE_URL:-https://api.deepseek.com/v1}
+      API_KEY: ${API_KEY:-}
+      MODEL: ${MODEL:-deepseek-flash}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      DATA_DIR: /data
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-15}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-120}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
