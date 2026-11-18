@@ -6,6 +6,22 @@
 
 [English README](./README.en.md)
 
+## Windows 用户：三步开始（不用装任何环境）
+
+1. 到 [Releases](https://github.com/Griffin-xcy/recall-card/releases/latest) 下载 `RecallCard.exe`
+2. 双击它。浏览器会自动打开，没跳出来就手动访问 `http://127.0.0.1:8765`
+3. 打开就有一份示例卡片。点「导入」上传自己的笔记，或先玩示例
+
+不需要 Python、不需要 Node、不需要 Docker、不需要命令行。**单个 exe，26 MB，双击即用。**
+
+第一次打开会自带一份示例材料，所以就算你没有 API Key，也能先看到成品长什么样。
+
+想生成自己的卡片，点右上角「连接模型」，选 DeepSeek 填 Key 即可（DeepSeek 最便宜，充 10 块能用很久）。
+
+> **用完怎么退出？** 直接关掉那个黑色命令窗口。
+> **数据存在哪？** `%LOCALAPPDATA%\RecallCard`，删掉这个文件夹等于清空所有数据。
+> **杀毒软件报警？** 单文件 exe 是打包工具的通病，源码完全公开，介意的话用下面的 Docker 方式。
+
 ## 已实现
 
 - 上传 PDF 以及 TXT、Markdown、PY、JS、JSON 等任意扩展名的文本和代码文件，递归选择整个文件夹并批量处理，或直接粘贴文本、提交网页链接
@@ -18,17 +34,29 @@
 - 卡片搜索、类型与主题筛选、编辑、删除
 - 导入记录与失败原因展示
 - 按主题导出 Markdown ZIP
-- 响应式网页、Docker Compose、CI 与自动化测试
+- 响应式网页、单文件 exe、Docker Compose、CI 与自动化测试
 
 第一版有意不做：登录、多用户、云同步、RAG 问答、移动 App、Anki 和复习队列。
 
-## Docker 启动（推荐）
+## Docker 启动
+
+适合部署在服务器上，或者你本来就习惯用 Docker。
 
 ```bash
 docker compose up --build
 ```
 
+国内拉取 Docker Hub 基础镜像可能很慢，先在 Docker Desktop 的「设置 → Docker Engine」里配置镜像加速，否则这一步容易卡住。
+
 打开 http://localhost:8000 ，点击右上角“连接模型”，先选择服务商，再输入 API Key。已内置 DeepSeek、Kimi（Moonshot AI）、OpenAI、通义千问、智谱 AI 和 Ollama（本地）预设，也可使用自定义 OpenAI 兼容接口；接口地址和模型名仍可修改。选择通义千问时需将地址中的 `WorkspaceId` 替换为实际业务空间 ID；使用 Ollama 前需先启动本地服务并下载对应模型。页面保存的设置与材料都存放在 `./data` 的 SQLite 数据库中，重建容器不会清空；API Key 不会回显到页面或包含在导出文件中。仍可通过 `.env` 预设配置，方法见 `.env.example`。
+
+## 自己打包 exe
+
+```powershell
+pwsh -File scripts/build_exe.ps1
+```
+
+产物在 `release\RecallCard.exe`。脚本会依次安装依赖、构建前端、生成图标、调用 PyInstaller。
 
 ## 本地开发
 

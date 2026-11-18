@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt -r requirements-dev.txt pyinstaller
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Backend tests
+        run: python -m pytest -q
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Generate icon
+        run: python scripts/make_icon.py
+
+      - name: Build executable
+        run: python -m PyInstaller recall-card.spec --noconfirm --distpath release --workpath build/pyinstaller
+
+      - name: Smoke test the exe
+        shell: pwsh
+        run: |
+          $exe = "release\RecallCard.exe"
+          if (-not (Test-Path $exe)) { throw "exe 没有生成" }
+          $proc = Start-Process -FilePath $exe -ArgumentList "--no-browser", "--port", "8799" -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Milliseconds 500
+            try {
+              $health = Invoke-RestMethod -Uri "http://127.0.0.1:8799/api/health" -TimeoutSec 2
+              if ($health.status -eq "ok") { $ok = $true; break }
+            } catch { }
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "exe 启动后健康检查失败" }
+          Write-Host "exe 启动正常"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/RecallCard.exe
+          name: 拾记 Recall Card ${{ github.ref_name }}
+          draft: false
+          generate_release_notes: true

@@ -1,13 +1,15 @@
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from .config import ROOT_DIR, Settings
+from .config import BUNDLE_DIR, FROZEN, Settings
 from .db import Database, content_fingerprint
+from .demo import seed_demo
 from .export import build_markdown_zip
 from .extractor import ExtractionError, extract_pdf, extract_text, extract_webpage
 from .pipeline import process_material
@@ -17,12 +19,29 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("recall-card")
 
 
+def _should_seed_demo() -> bool:
+    """打包版首次启动自动填示例卡片；源码运行和测试默认不填。
+
+    想手动验证可以设置 RECALL_CARD_SEED_DEMO=1。
+    """
+    forced = os.environ.get("RECALL_CARD_SEED_DEMO")
+    if forced is not None:
+        return forced.strip().lower() not in ("", "0", "false", "no")
+    return FROZEN
+
+
 def create_app() -> FastAPI:
     settings = Settings()
     db = Database(settings.database_path)
     for key, value in db.get_settings().items():
         if key in {"base_url", "api_key", "model", "llm_provider"} and value:
             setattr(settings, key, value)
+    if _should_seed_demo():
+        try:
+            if seed_demo(db):
+                logger.info("首次启动，已写入示例卡片")
+        except Exception:  # 示例卡片失败不能影响正常启动
+            logger.exception("写入示例卡片失败")
     application = FastAPI(title="拾记 Recall Card", version="0.1.0")
 
     async def regenerate_safely(material_id: int) -> list[dict]:
@@ -225,7 +244,7 @@ def create_app() -> FastAPI:
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
-    dist_dir = ROOT_DIR / "dist"
+    dist_dir = BUNDLE_DIR / "dist"
     if dist_dir.exists():
         application.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
     return application

@@ -6,6 +6,20 @@ Turn PDFs, study notes and web pages into cards you can actually review. Runs lo
 
 [中文说明](./README.md)
 
+## Windows: three steps, no setup required
+
+1. Download `RecallCard.exe` from [Releases](https://github.com/Griffin-xcy/recall-card/releases/latest)
+2. Double-click it. Your browser opens automatically; if it does not, visit `http://127.0.0.1:8765`
+3. It already contains sample cards. Import your own notes, or explore the samples first
+
+No Python, no Node, no Docker, no terminal. One 26 MB executable.
+
+The first launch seeds a sample material, so you can see what the output looks like before you have an API key. To generate your own cards, click **Connect model**, pick DeepSeek and paste a key (DeepSeek is the cheapest option).
+
+> **How do I quit?** Close the black console window.
+> **Where is my data?** `%LOCALAPPDATA%\RecallCard`. Deleting that folder clears everything.
+> **Antivirus warning?** A known trade-off of single-file executables. The source is fully public; use Docker if you would rather avoid it.
+
 ## Features
 
 - Import PDF and text/code files with any extension, including TXT, Markdown, Python, JavaScript and JSON; import pasted text or public web pages
@@ -18,17 +32,27 @@ Turn PDFs, study notes and web pages into cards you can actually review. Runs lo
 - Search, filter, edit and delete cards
 - Import history with visible failure reasons
 - Export topic-organized Markdown files as ZIP
-- Responsive UI, Docker Compose, CI and automated tests
+- Responsive UI, single-file Windows executable, Docker Compose, CI and automated tests
 
 The first release intentionally excludes accounts, cloud sync, RAG chat, mobile apps, Anki and review scheduling.
 
 ## Run with Docker
+
+Useful for servers, or if Docker is already part of your workflow.
 
 ```bash
 docker compose up --build
 ```
 
 Open http://localhost:8000 and click **Connect model**, then choose a provider and enter your API key. Presets cover DeepSeek, Kimi (Moonshot AI), OpenAI, Qwen, Zhipu AI and local Ollama, plus custom OpenAI-compatible endpoints. Base URLs and model names remain editable. For Qwen, replace `WorkspaceId` with your Alibaba Cloud workspace ID; for Ollama, start the local service and pull the selected model first. No `.env` editing is required. Settings and content are stored in the local SQLite database under `./data`; keys are never echoed back by the API or included in exports. You can still preset values through `.env.example`.
+
+## Build the executable yourself
+
+```powershell
+pwsh -File scripts/build_exe.ps1
+```
+
+The result is `release\RecallCard.exe`. The script installs dependencies, builds the frontend, generates the icon and runs PyInstaller.
 
 ## Local development
 
