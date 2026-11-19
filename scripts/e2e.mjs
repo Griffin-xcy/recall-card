@@ -219,6 +219,8 @@ try {
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   // 复习流程：翻面看答案、标记会了，进度和后台状态都要跟着走
+  // 先等提示条消失，避免它盖在复习面板底部的按钮上
+  await expect(page.locator('.toast')).toHaveCount(0, { timeout: 10000 })
   await page.getByRole('button', { name: /开始复习/ }).click()
   await expect(page.locator('.review-panel')).toBeVisible()
   await expect(page.locator('.review-progress-text')).toHaveText('1 / 6')
@@ -227,14 +229,14 @@ try {
   await expect(page.locator('.review-answer')).toBeVisible()
   await page.screenshot({ path: path.join(artifacts, 'desktop-review.png'), fullPage: true })
   await page.getByRole('button', { name: /^会了/ }).click()
-  await expect(page.locator('.review-progress-text')).toHaveText('2 / 6')
-  await page.locator('.review-header .icon-button').click()
-  await expect(page.locator('.review-panel')).toHaveCount(0)
-  const knownCards = await page.evaluate(async () => {
+  // 先确认后端真的记下了，再看界面是否推进，避免只盯着一个动画时序
+  await expect.poll(async () => page.evaluate(async () => {
     const response = await fetch('/api/cards')
     return (await response.json()).filter((card) => card.review_state === 'known').length
-  })
-  expect(knownCards).toBe(1)
+  }), { timeout: 15000 }).toBe(1)
+  await expect(page.locator('.review-progress-text')).toHaveText('2 / 6', { timeout: 15000 })
+  await page.locator('.review-header .icon-button').click()
+  await expect(page.locator('.review-panel')).toHaveCount(0)
   await expect(page.locator('.review-badge.known').first()).toBeVisible()
 
   const mobile = await browser.newContext({ viewport: { width: 375, height: 812 } })
