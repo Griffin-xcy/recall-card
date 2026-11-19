@@ -46,4 +46,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="build/icon.ico",
+    version="scripts/version_info.txt",
 )

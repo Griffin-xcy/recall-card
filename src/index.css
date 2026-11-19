@@ -304,3 +304,5 @@ input::placeholder, textarea::placeholder { color: var(--ink-muted); }
 .config-add input { flex: 1; min-width: 0; }
 .config-add button { min-height: 40px; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink-soft); font-size: 13px; font-weight: 650; }
 .config-add button:hover { background: var(--sage-100); color: var(--ink); }
+
+.provider-hint a, .field-hint a { color: var(--pine-700); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

@@ -25,3 +25,25 @@ jobs:
       - run: python scripts/smoke.py
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  # Windows 上单独跑一遍。打包产物是 Windows exe，
+  # 控制台编码、路径分隔符、文件锁这些都只有 Windows 才暴露问题，
+  # 只在 ubuntu 上测会让问题漏到发布流程里。
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: pip install -r requirements-dev.txt
+      - run: npm ci
+      - run: python -m pytest -q
+      - run: npm run build
+      - name: 检查打包脚本能跑通
+        run: python scripts/make_icon.py

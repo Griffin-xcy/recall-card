@@ -70,7 +70,15 @@ DEMO_CARDS = [
 
 
 def seed_demo(db: Database) -> bool:
-    """数据库为空时写入一份示例材料。返回是否真的写入了。"""
+    """首次启动写入一份示例材料。返回是否真的写入了。
+
+    用 app_settings 里的 demo_seeded 做标记，防止重复写入：
+    用户把示例卡片删光后重启，不应该又冒出来一份。
+    """
+    if db.get_settings().get("demo_seeded") == "1":
+        return False
+    db.save_settings({"demo_seeded": "1"})
+
     if db.list_materials():
         return False
 

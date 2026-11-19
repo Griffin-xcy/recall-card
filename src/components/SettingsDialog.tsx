@@ -14,13 +14,13 @@ interface Props {
 }
 
 const providers = [
-  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-flash' },
-  { id: 'kimi', name: 'Kimi（Moonshot AI）', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3.1-pro' },
-  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.4' },
-  { id: 'qwen', name: '通义千问', baseUrl: 'https://WorkspaceId.cn-beijing.maas.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.3' },
-  { id: 'ollama', name: 'Ollama（本地模型）', baseUrl: 'http://localhost:11434/v1', model: 'qwen3:8b' },
-  { id: 'custom', name: '自定义 OpenAI 兼容接口', baseUrl: '', model: '' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-flash', helpUrl: 'https://platform.deepseek.com/api_keys' },
+  { id: 'kimi', name: 'Kimi（Moonshot AI）', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3.1-pro', helpUrl: 'https://platform.moonshot.cn/console/api-keys' },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.4', helpUrl: 'https://platform.openai.com/api-keys' },
+  { id: 'qwen', name: '通义千问', baseUrl: 'https://WorkspaceId.cn-beijing.maas.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', helpUrl: 'https://bailian.console.aliyun.com/' },
+  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.3', helpUrl: 'https://open.bigmodel.cn/usercenter/apikeys' },
+  { id: 'ollama', name: 'Ollama（本地模型）', baseUrl: 'http://localhost:11434/v1', model: 'qwen3:8b', helpUrl: '' },
+  { id: 'custom', name: '自定义 OpenAI 兼容接口', baseUrl: '', model: '', helpUrl: '' },
 ]
 
 function detectProvider(baseUrl?: string) {
@@ -39,6 +39,7 @@ export default function SettingsDialog({ health, topics, kinds, onClose, onSaved
   const [error, setError] = useState('')
   const [newTopic, setNewTopic] = useState('')
   const [newKind, setNewKind] = useState('')
+  const currentProvider = providers.find((item) => item.id === provider) || providers[0]
 
   const changeProvider = (nextId: string) => {
     const next = providers.find((item) => item.id === nextId)
@@ -124,6 +125,7 @@ export default function SettingsDialog({ health, topics, kinds, onClose, onSaved
         </label>
         <div className="field-group"><label htmlFor="api-key">API Key</label>
           <div className="secret-input"><KeyRound size={17} /><input id="api-key" type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={provider === 'ollama' ? '本地 Ollama 可保持为 ollama' : health?.has_api_key && provider === detectProvider(health.base_url) ? '留空则保留已保存的 Key' : '输入你的模型 API Key'} autoComplete="off" disabled={busy} /><button type="button" className="icon-button" onClick={() => setShowKey((visible) => !visible)} aria-label={showKey ? '隐藏 API Key' : '显示 API Key'}>{showKey ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
+          {currentProvider.helpUrl && <span className="field-hint">还没有 Key？<a href={currentProvider.helpUrl} target="_blank" rel="noreferrer">去 {currentProvider.name} 开放平台申请</a>，把生成的一整串字符粘贴到上面。</span>}
         </div>
         <label>接口地址<input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" disabled={busy} /><span className="field-hint">填写 API 根地址，应用会自动追加 /chat/completions。</span></label>
         <label>模型名称<input value={model} onChange={(event) => setModel(event.target.value)} placeholder="输入服务商提供的模型 ID" maxLength={200} disabled={busy} /></label>

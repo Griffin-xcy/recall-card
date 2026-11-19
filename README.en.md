@@ -14,8 +14,9 @@ Turn PDFs, study notes and web pages into cards you can actually review. Runs lo
 
 No Python, no Node, no Docker, no terminal. One 26 MB executable.
 
-The first launch seeds a sample material, so you can see what the output looks like before you have an API key. To generate your own cards, click **Connect model**, pick DeepSeek and paste a key (DeepSeek is the cheapest option).
+The first launch seeds a sample material, so you can see what the output looks like before you have an API key. The sample is seeded once; deleting it will not bring it back. To generate your own cards, click **Connect model**, pick DeepSeek and paste a key (DeepSeek is the cheapest option). The dialog links straight to each provider's key page.
 
+> **The first double-click takes 10-20 seconds**, and the console window may look empty. It is unpacking the runtime, not hanging. The browser opens on its own once it is ready. Later launches are fast.
 > **How do I quit?** Close the black console window.
 > **Where is my data?** `%LOCALAPPDATA%\RecallCard`. Deleting that folder clears everything.
 > **Antivirus warning?** A known trade-off of single-file executables. The source is fully public; use Docker if you would rather avoid it.
