@@ -41,11 +41,12 @@ export const api = {
   deleteKind: (name: string) => request<void>(`/api/config/kinds/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   materials: () => request<Material[]>('/api/materials'),
   getMaterial: (id: number) => request<Material>(`/api/materials/${id}`),
-  cards: (topic: string, kind: string, query: string) => {
+  cards: (topic: string, kind: string, query: string, state = '') => {
     const params = new URLSearchParams()
     if (topic) params.set('topic', topic)
     if (kind) params.set('kind', kind)
     if (query) params.set('q', query)
+    if (state) params.set('state', state)
     return request<Card[]>(`/api/cards?${params}`)
   },
   importText: (title: string, content: string) => request<{ material: Material; cards: Card[] }>('/api/materials/text', {

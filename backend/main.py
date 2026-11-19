@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
                 logger.info("首次启动，已写入示例卡片")
         except Exception:  # 示例卡片失败不能影响正常启动
             logger.exception("写入示例卡片失败")
-    application = FastAPI(title="拾记 Recall Card", version="0.3.0")
+    application = FastAPI(title="拾记 Recall Card", version="0.4.0")
 
     async def regenerate_safely(material_id: int) -> list[dict]:
         """重新生成卡片；失败时回滚到原卡片，避免数据丢失。"""
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     def health() -> dict:
         return {
             "status": "ok",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "model_configured": settings.model_configured,
             "has_api_key": bool(settings.api_key),
             "provider": settings.llm_provider,
@@ -147,8 +147,8 @@ def create_app() -> FastAPI:
         return db.list_materials()
 
     @application.get("/api/cards")
-    def cards(topic: str = "", kind: str = "", q: str = "") -> list[dict]:
-        return db.list_cards(topic=topic, kind=kind, query=q.strip())
+    def cards(topic: str = "", kind: str = "", q: str = "", state: str = "") -> list[dict]:
+        return db.list_cards(topic=topic, kind=kind, query=q.strip(), state=state)
 
     @application.post("/api/materials/file", status_code=201)
     async def upload_material(response: Response, file: UploadFile = File(...), source_path: str = Form(default=""), force: bool = Form(default=False)) -> dict:

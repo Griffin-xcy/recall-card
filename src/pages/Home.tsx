@@ -12,6 +12,21 @@ import SettingsDialog from '../components/SettingsDialog'
 import type { Card, Config, Health, Material, Stats, TopicCount } from '../types'
 
 const emptyStats: Stats = { cards: 0, materials: 0, topics: 0, reviewed_cards: 0, known_cards: 0, again_cards: 0 }
+const PAGE_SIZE = 24
+
+function groupKey(card: Card, by: 'material' | 'topic' | 'kind' | 'none'): string {
+  if (by === 'material') return `m-${card.material_id}`
+  if (by === 'topic') return `t-${card.topic}`
+  if (by === 'kind') return `k-${card.kind}`
+  return 'all'
+}
+
+function groupTitle(card: Card, by: 'material' | 'topic' | 'kind' | 'none'): string {
+  if (by === 'material') return card.material_title
+  if (by === 'topic') return card.topic
+  if (by === 'kind') return card.kind
+  return '全部卡片'
+}
 const sampleText = `间隔重复是一种通过逐步增加复习间隔来巩固记忆的学习方法。它要求学习者在即将遗忘时再次接触材料，而不是连续重复阅读。
 
 主动回忆指在不查看答案的情况下尝试提取信息。与被动阅读相比，主动回忆能更清楚地暴露知识盲点，并加强记忆路径。
@@ -27,6 +42,10 @@ export default function Home() {
   const [config, setConfig] = useState<Config>({ topics: [], kinds: [] })
   const [selectedTopic, setSelectedTopic] = useState('')
   const [selectedKind, setSelectedKind] = useState('')
+  const [selectedState, setSelectedState] = useState<'' | 'new' | 'known' | 'again'>('')
+  const [groupBy, setGroupBy] = useState<'material' | 'topic' | 'kind' | 'none'>('material')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'title'>('newest')
+  const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'cards' | 'materials'>('cards')
   const [loading, setLoading] = useState(true)
@@ -71,14 +90,14 @@ export default function Home() {
     setLoading(true)
     setLoadError('')
     try {
-      const result = await api.cards(selectedTopic, selectedKind, query.trim())
+      const result = await api.cards(selectedTopic, selectedKind, query.trim(), selectedState)
       if (!signal?.aborted) setCards(result)
     } catch (caught) {
       if (!signal?.aborted) setLoadError(caught instanceof Error ? caught.message : '卡片加载失败')
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }, [selectedTopic, selectedKind, query])
+  }, [selectedTopic, selectedKind, selectedState, query])
 
   useEffect(() => {
     void refreshMeta()
@@ -150,19 +169,66 @@ export default function Home() {
     setView('cards')
   }
 
-  // 卡片按来源材料分组，最新的材料排在最前面。
-  // 导入完成后不需要额外跳转，新分组天然就在顶部。
-  const groups = useMemo(() => {
-    const map = new Map<number, { id: number; title: string; date: string; cards: Card[] }>()
-    for (const card of cards) {
-      const group = map.get(card.material_id)
-      if (group) group.cards.push(card)
-      else map.set(card.material_id, { id: card.material_id, title: card.material_title, date: card.created_at, cards: [card] })
+  // 排序 → 分页 → 分组。分组只影响展示，分页按卡片数量切。
+  const sortedCards = useMemo(() => {
+    const list = [...cards]
+    if (sortBy === 'oldest') return list.sort((a, b) => a.id - b.id)
+    if (sortBy === 'title') return list.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'))
+    return list.sort((a, b) => b.id - a.id)
+  }, [cards, sortBy])
+
+  const pageCount = Math.max(1, Math.ceil(sortedCards.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageCards = useMemo(
+    () => sortedCards.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sortedCards, currentPage],
+  )
+
+  const groupMeta = useMemo(() => {
+    const map = new Map<string, { title: string; date: string; total: number; known: number; cards: Card[] }>()
+    for (const card of sortedCards) {
+      const key = groupKey(card, groupBy)
+      const entry = map.get(key)
+      if (entry) {
+        entry.total += 1
+        entry.cards.push(card)
+        if (card.review_state === 'known') entry.known += 1
+      } else {
+        map.set(key, {
+          title: groupTitle(card, groupBy),
+          date: card.created_at,
+          total: 1,
+          known: card.review_state === 'known' ? 1 : 0,
+          cards: [card],
+        })
+      }
     }
-    return [...map.values()]
-      .map((group) => ({ ...group, cards: [...group.cards].sort((a, b) => a.id - b.id) }))
-      .sort((a, b) => (a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1))
-  }, [cards])
+    return map
+  }, [sortedCards, groupBy])
+
+  const pageGroups = useMemo(() => {
+    const map = new Map<string, Card[]>()
+    for (const card of pageCards) {
+      const key = groupKey(card, groupBy)
+      const list = map.get(key)
+      if (list) list.push(card)
+      else map.set(key, [card])
+    }
+    return [...map.entries()].map(([key, list]) => ({ key, cards: list }))
+  }, [pageCards, groupBy])
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedTopic, selectedKind, selectedState, query, sortBy, groupBy])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
+  const pageNumbers = useMemo(() => {
+    const wanted = new Set<number>([1, pageCount, currentPage, currentPage - 1, currentPage + 1])
+    return [...wanted].filter((value) => value >= 1 && value <= pageCount).sort((a, b) => a - b)
+  }, [currentPage, pageCount])
 
   const startReview = (target: Card[], title: string) => {
     const pending = target.filter((card) => card.review_state !== 'known')
@@ -292,9 +358,44 @@ export default function Home() {
           <>
             <div className="filter-bar">
               <label className="search-box"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、内容或标签" aria-label="搜索卡片" />{query && <button type="button" onClick={() => setQuery('')} aria-label="清空搜索">清除</button>}</label>
+              <div className="kind-filters" aria-label="按复习状态筛选">
+                {([
+                  { id: '', label: '全部状态' },
+                  { id: 'new', label: '待复习' },
+                  { id: 'known', label: '已掌握' },
+                  { id: 'again', label: '再看看' },
+                ] as const).map((option) => (
+                  <button type="button" key={option.id} className={selectedState === option.id ? 'filter-chip active' : 'filter-chip'} onClick={() => setSelectedState(option.id)}>{option.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="filter-bar filter-bar-sub">
               <div className="kind-filters" aria-label="按类型筛选">
                 <button type="button" className={selectedKind === '' ? 'filter-chip active' : 'filter-chip'} onClick={() => setSelectedKind('')}>全部类型</button>
                 {config.kinds.map((kind) => <button type="button" key={kind} className={selectedKind === kind ? 'filter-chip active' : 'filter-chip'} onClick={() => setSelectedKind(kind)}>{kind}</button>)}
+              </div>
+              <div className="filter-selects">
+                <label className="filter-select">主题
+                  <select aria-label="按主题筛选" value={selectedTopic} onChange={(event) => setSelectedTopic(event.target.value)}>
+                    <option value="">全部主题</option>
+                    {topics.map((topic) => <option key={topic.topic} value={topic.topic}>{topic.topic}（{topic.count}）</option>)}
+                  </select>
+                </label>
+                <label className="filter-select">分类
+                  <select aria-label="卡片分组方式" value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}>
+                    <option value="material">按材料</option>
+                    <option value="topic">按主题</option>
+                    <option value="kind">按类型</option>
+                    <option value="none">不分组</option>
+                  </select>
+                </label>
+                <label className="filter-select">排序
+                  <select aria-label="卡片排序方式" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}>
+                    <option value="newest">最新在前</option>
+                    <option value="oldest">最早在前</option>
+                    <option value="title">按标题</option>
+                  </select>
+                </label>
               </div>
             </div>
 
@@ -306,30 +407,38 @@ export default function Home() {
                       <div className="empty-illustration"><Inbox size={38} /></div>
                       <h2>{stats.cards === 0 ? health && !health.model_configured ? '先连接你的模型' : '从第一份材料开始' : '没有找到匹配的卡片'}</h2>
                       <p>{stats.cards === 0 ? health && !health.model_configured ? '选择 DeepSeek、Kimi、OpenAI 等服务商，或使用本地 Ollama。连接后再导入材料。' : '上传一份 PDF，或粘贴一段笔记。拾记会提取真正值得复习的内容。' : '试试更换主题、类型或搜索关键词。'}</p>
-                      {stats.cards === 0 ? health && !health.model_configured ? <button type="button" className="button button-primary" onClick={() => setSettingsOpen(true)}><Settings2 size={17} />连接模型</button> : <div className="empty-actions"><button type="button" className="button button-primary" onClick={() => openImport()}><Plus size={17} />导入第一份材料</button><button type="button" className="button button-ghost" onClick={() => openImport(sampleText)}>使用示例文本</button></div> : <button type="button" className="button button-secondary" onClick={() => { setQuery(''); setSelectedKind(''); setSelectedTopic('') }}>清除筛选</button>}
+                      {stats.cards === 0 ? health && !health.model_configured ? <button type="button" className="button button-primary" onClick={() => setSettingsOpen(true)}><Settings2 size={17} />连接模型</button> : <div className="empty-actions"><button type="button" className="button button-primary" onClick={() => openImport()}><Plus size={17} />导入第一份材料</button><button type="button" className="button button-ghost" onClick={() => openImport(sampleText)}>使用示例文本</button></div> : <button type="button" className="button button-secondary" onClick={() => { setQuery(''); setSelectedKind(''); setSelectedState(''); setSelectedTopic('') }}>清除筛选</button>}
                     </div>
                   ) : (
                     <div className="card-groups">
-                      {groups.map((group) => {
-                        const known = group.cards.filter((card) => card.review_state === 'known').length
-                        const pending = group.cards.length - known
+                      {pageGroups.map(({ key, cards: groupCards }) => {
+                        const meta = groupMeta.get(key)
+                        const total = meta?.total ?? groupCards.length
+                        const known = meta?.known ?? 0
+                        const pending = total - known
+                        const title = meta?.title || '全部卡片'
+                        // 分组被分页切开时，下一页要标「续」，否则顶部会出现没有来源的卡片
+                        const continuing = Boolean(meta?.cards[0] && meta.cards[0].id !== groupCards[0].id)
                         return (
-                          <section className="card-group" key={group.id}>
+                          <section className="card-group" key={key}>
                             <header className="group-header">
                               <div className="group-title">
                                 <FileText size={16} />
-                                <h2 title={group.title}>{group.title}</h2>
-                                <span className="group-meta">{group.cards.length} 张 · {new Date(group.date).toLocaleDateString('zh-CN')}</span>
+                                <h2 title={title}>{title}{continuing && <span className="group-continued">续</span>}</h2>
+                                <span className="group-meta">
+                                  {total} 张{groupBy === 'material' && meta ? ` · ${new Date(meta.date).toLocaleDateString('zh-CN')}` : ''}
+                                  {groupCards.length < total ? `（本页 ${groupCards.length} 张）` : ''}
+                                </span>
                               </div>
                               <div className="group-actions">
-                                <span className="group-progress">{known}/{group.cards.length} 已掌握</span>
-                                <button type="button" className="button button-ghost group-review" onClick={() => startReview(group.cards, group.title)} disabled={pending === 0}>
-                                  <Play size={15} />{pending === 0 ? '已全部掌握' : `复习这份（剩 ${pending}）`}
+                                <span className="group-progress">{known}/{total} 已掌握</span>
+                                <button type="button" className="button button-ghost group-review" onClick={() => startReview(meta?.cards ?? groupCards, title)} disabled={pending === 0}>
+                                  <Play size={15} />{pending === 0 ? '已全部掌握' : `${groupBy === 'material' ? '复习这份' : '复习这组'}（剩 ${pending}）`}
                                 </button>
                               </div>
                             </header>
                             <div className="card-grid">
-                              {group.cards.map((card) => (
+                              {groupCards.map((card) => (
                                 <article className={`study-card ${selectMode ? 'selectable' : ''} ${selectedIds.includes(card.id) ? 'selected' : ''}`} key={card.id} onClick={selectMode ? () => toggleSelect(card.id) : undefined}>
                                   {selectMode && <span className="bulk-check" aria-hidden>{selectedIds.includes(card.id) && <Check size={13} />}</span>}
                                   <div className="card-topline"><span className={`kind-badge kind-${(Math.max(config.kinds.indexOf(card.kind), 0) % 4) + 1}`}>{card.kind}</span><span className="card-topic">{card.topic}</span>{card.review_state === 'known' && <span className="review-badge known">已掌握</span>}{card.review_state === 'again' && <span className="review-badge again">再看看</span>}{!selectMode && <div className="card-tools"><button type="button" className="icon-button" onClick={() => setEditing(card)} aria-label={`编辑 ${card.title}`}><Pencil size={16} /></button><button type="button" className="icon-button delete-tool" onClick={() => setDeleting(card)} aria-label={`删除 ${card.title}`}><Trash2 size={16} /></button></div>}</div>
@@ -337,7 +446,7 @@ export default function Home() {
                                   {card.question && <p className="card-question">{card.question}</p>}
                                   <p className="card-answer">{card.answer}</p>
                                   {card.tags.length > 0 && <div className="tag-list">{card.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>}
-                                  <footer><span className="card-source" title={group.title}>{card.review_state === 'known' ? '已掌握' : card.review_state === 'again' ? '再看看' : '待复习'}</span><span>{new Date(card.created_at).toLocaleDateString('zh-CN')}</span></footer>
+                                  <footer><span className="card-source" title={title}>{card.review_state === 'known' ? '已掌握' : card.review_state === 'again' ? '再看看' : '待复习'}</span><span>{new Date(card.created_at).toLocaleDateString('zh-CN')}</span></footer>
                                 </article>
                               ))}
                             </div>
@@ -346,6 +455,21 @@ export default function Home() {
                       })}
                     </div>
                   )}
+              {!loading && !loadError && cards.length > 0 && pageCount > 1 && (
+                <nav className="pager" aria-label="分页">
+                  <span className="pager-info">共 {sortedCards.length} 张，第 {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sortedCards.length)} 张</span>
+                  <div className="pager-buttons">
+                    <button type="button" className="pager-button" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1}>上一页</button>
+                    {pageNumbers.map((number, index) => (
+                      <span key={number} className="pager-slot">
+                        {index > 0 && number - pageNumbers[index - 1] > 1 && <span className="pager-gap">…</span>}
+                        <button type="button" className={number === currentPage ? 'pager-button active' : 'pager-button'} onClick={() => setPage(number)} aria-current={number === currentPage ? 'page' : undefined}>{number}</button>
+                      </span>
+                    ))}
+                    <button type="button" className="pager-button" onClick={() => setPage(currentPage + 1)} disabled={currentPage === pageCount}>下一页</button>
+                  </div>
+                </nav>
+              )}
             </div>
           </>
         ) : (

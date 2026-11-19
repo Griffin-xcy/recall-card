@@ -234,7 +234,7 @@ class Database:
             ).fetchall()
         return [self._card(row) for row in rows]
 
-    def list_cards(self, topic: str = "", kind: str = "", query: str = "") -> list[dict[str, Any]]:
+    def list_cards(self, topic: str = "", kind: str = "", query: str = "", state: str = "") -> list[dict[str, Any]]:
         clauses: list[str] = []
         params: list[str] = []
         if topic:
@@ -243,6 +243,9 @@ class Database:
         if kind:
             clauses.append("c.kind = ?")
             params.append(kind)
+        if state in {"new", "known", "again"}:
+            clauses.append("c.review_state = ?")
+            params.append(state)
         if query:
             clauses.append("(c.title LIKE ? OR c.question LIKE ? OR c.answer LIKE ? OR c.tags LIKE ?)")
             params.extend([f"%{query}%"] * 4)

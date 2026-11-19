@@ -199,3 +199,19 @@ def test_bulk_update_and_delete(client):
     deleted = client.post("/api/cards/bulk-delete", json={"ids": ids[:2]})
     assert deleted.json()["deleted"] == 2
     assert len(client.get("/api/cards").json()) == len(ids) - 2
+
+
+def test_cards_filter_by_review_state(client):
+    ingest_text(client)
+    ids = [card["id"] for card in client.get("/api/cards").json()]
+    client.post("/api/cards/bulk-update", json={"ids": ids[:2], "review_state": "known"})
+    client.post("/api/cards/bulk-update", json={"ids": ids[2:3], "review_state": "again"})
+
+    assert len(client.get("/api/cards?state=known").json()) == 2
+    assert len(client.get("/api/cards?state=again").json()) == 1
+    assert len(client.get("/api/cards?state=new").json()) == len(ids) - 3
+    assert len(client.get("/api/cards?state=").json()) == len(ids)
+    # 状态和类型可以叠加
+    kind = client.get("/api/cards?state=known").json()[0]["kind"]
+    filtered = client.get(f"/api/cards?state=known&kind={kind}").json()
+    assert filtered and all(card["kind"] == kind for card in filtered)
