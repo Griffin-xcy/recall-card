@@ -19,6 +19,7 @@ jobs:
           cache: npm
       - run: pip install -r requirements-dev.txt
       - run: npm ci
+      - run: python scripts/check_bom.py
       - run: python -m pytest -q
       - run: npm run lint
       - run: npm run build
@@ -43,6 +44,7 @@ jobs:
           cache: npm
       - run: pip install -r requirements-dev.txt
       - run: npm ci
+      - run: python scripts/check_bom.py
       - run: python -m pytest -q
       - run: npm run build
       - name: 检查打包脚本能跑通
