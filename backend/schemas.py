@@ -46,3 +46,14 @@ class KindInput(BaseModel):
 
 class ReviewInput(BaseModel):
     state: Literal["new", "known", "again"]
+
+
+class BulkUpdateInput(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=500)
+    review_state: Literal["new", "known", "again"] | None = None
+    topic: str | None = Field(default=None, min_length=1, max_length=60)
+    kind: str | None = Field(default=None, min_length=1, max_length=30)
+
+
+class BulkIdsInput(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=500)

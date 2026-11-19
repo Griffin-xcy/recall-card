@@ -344,6 +344,43 @@ class Database:
             "again_cards": counts.get("again", 0),
         }
 
+    def bulk_update(
+        self,
+        card_ids: list[int],
+        review_state: str | None = None,
+        topic: str | None = None,
+        kind: str | None = None,
+    ) -> int:
+        """批量改复习状态、主题或类型。返回实际影响的卡片数。"""
+        values: dict[str, Any] = {}
+        if review_state is not None:
+            values["review_state"] = review_state
+            values["reviewed_at"] = "" if review_state == "new" else utc_now()
+        if topic is not None:
+            if topic not in self.list_topics():
+                raise ValueError(f"主题「{topic}」不存在")
+            values["topic"] = topic
+        if kind is not None:
+            if kind not in self.list_kinds():
+                raise ValueError(f"类型「{kind}」不存在")
+            values["kind"] = kind
+        if not values:
+            raise ValueError("没有要修改的字段")
+        placeholders = ",".join("?" for _ in card_ids)
+        assignments = ", ".join(f"{key} = ?" for key in values)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"UPDATE cards SET {assignments} WHERE id IN ({placeholders})",
+                [*values.values(), *card_ids],
+            )
+            return cursor.rowcount
+
+    def bulk_delete(self, card_ids: list[int]) -> int:
+        placeholders = ",".join("?" for _ in card_ids)
+        with self.connect() as connection:
+            cursor = connection.execute(f"DELETE FROM cards WHERE id IN ({placeholders})", card_ids)
+            return cursor.rowcount
+
     def set_review_state(self, card_id: int, state: str) -> dict[str, Any]:
         with self.connect() as connection:
             cursor = connection.execute(

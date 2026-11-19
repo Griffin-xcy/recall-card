@@ -368,3 +368,23 @@ input::placeholder, textarea::placeholder { color: var(--ink-muted); }
 .review-body { justify-content: flex-start; }
 
 .review-finished > svg { display: block; margin: 0 auto 4px; }
+
+/* ---------- bulk selection ---------- */
+.study-card { position: relative; }
+.bulk-toggle.active { background: var(--pine-800); color: var(--paper); border-color: var(--pine-800); }
+.study-card.selectable { cursor: pointer; }
+.study-card.selected { border-color: var(--pine-700); box-shadow: 0 0 0 2px oklch(0.6 0.06 160 / .18); }
+.bulk-check { position: absolute; top: 14px; right: 14px; width: 21px; height: 21px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--paper); }
+.study-card.selected .bulk-check { background: var(--pine-800); border-color: var(--pine-800); }
+.bulk-bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px); padding: 12px 16px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 16px 40px oklch(0.25 0.02 155 / .18); }
+.bulk-select-all { border: 1px solid var(--line); background: var(--sage-50); color: var(--ink); border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.bulk-count { color: var(--pine-800); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bulk-action { min-height: 34px; padding: 0 12px; font-size: 12px; font-weight: 600; }
+.bulk-action.bulk-danger { color: var(--danger); border-color: oklch(0.88 0.05 28); }
+.bulk-actions select { min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink-soft); font-size: 12px; }
+.bulk-confirm-note { margin-bottom: 16px; padding: 12px; border-radius: 8px; background: var(--sage-50); color: var(--ink-soft); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .bulk-bar { left: 12px; right: 12px; bottom: 12px; transform: none; max-width: none; flex-wrap: wrap; }
+}

@@ -175,3 +175,27 @@ def test_review_state_roundtrip(client):
 
     assert client.post("/api/cards/999999/review", json={"state": "known"}).status_code == 404
     assert client.post(f"/api/cards/{card_id}/review", json={"state": "unknown"}).status_code == 422
+
+
+def test_bulk_update_and_delete(client):
+    ingest_text(client)
+    ids = [card["id"] for card in client.get("/api/cards").json()]
+    assert len(ids) >= 3
+
+    marked = client.post("/api/cards/bulk-update", json={"ids": ids[:2], "review_state": "known"})
+    assert marked.status_code == 200
+    assert marked.json()["updated"] == 2
+    assert client.get("/api/stats").json()["known_cards"] == 2
+
+    topic = client.get("/api/config").json()["topics"][2]
+    moved = client.post("/api/cards/bulk-update", json={"ids": ids, "topic": topic})
+    assert moved.json()["updated"] == len(ids)
+    assert {card["topic"] for card in client.get("/api/cards").json()} == {topic}
+
+    assert client.post("/api/cards/bulk-update", json={"ids": [], "review_state": "known"}).status_code == 422
+    assert client.post("/api/cards/bulk-update", json={"ids": ids, "topic": "不存在的主题"}).status_code == 422
+    assert client.post("/api/cards/bulk-update", json={"ids": ids}).status_code == 422
+
+    deleted = client.post("/api/cards/bulk-delete", json={"ids": ids[:2]})
+    assert deleted.json()["deleted"] == 2
+    assert len(client.get("/api/cards").json()) == len(ids) - 2

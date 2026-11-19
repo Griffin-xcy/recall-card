@@ -239,6 +239,26 @@ try {
   await expect(page.locator('.review-panel')).toHaveCount(0)
   await expect(page.locator('.review-badge.known').first()).toBeVisible()
 
+  // 批量管理：全选本页，批量标记已掌握，再退出
+  // 先重新加载一次，确保页面上的卡片就是服务端当前状态
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '批量管理' }).click()
+  await expect(page.locator('.bulk-bar')).toBeVisible()
+  await page.getByRole('button', { name: '全选本页' }).click()
+  const visibleCards = await page.locator('.study-card').count()
+  expect(visibleCards).toBeGreaterThan(0)
+  await expect(page.locator('.bulk-count')).toHaveText(`已选 ${visibleCards} 张`)
+  await page.getByRole('button', { name: '会了', exact: true }).click()
+  await expect(page.locator('.bulk-count')).toHaveText('已选 0 张', { timeout: 15000 })
+  // 不写死总数，直接断言「没有遗漏未标记的卡片」
+  await expect.poll(async () => page.evaluate(async () => {
+    const response = await fetch('/api/cards')
+    return (await response.json()).filter((card) => card.review_state !== 'known').length
+  }), { timeout: 15000 }).toBe(0)
+  await page.screenshot({ path: path.join(artifacts, 'desktop-bulk.png'), fullPage: true })
+  await page.getByRole('button', { name: '退出', exact: true }).click()
+  await expect(page.locator('.bulk-bar')).toHaveCount(0)
+
   const mobile = await browser.newContext({ viewport: { width: 375, height: 812 } })
   const mobilePage = await mobile.newPage()
   mobilePage.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(`mobile: ${message.text() + ' @ ' + message.location().url}`) })

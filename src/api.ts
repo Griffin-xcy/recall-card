@@ -78,6 +78,16 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ state }),
   }),
+  bulkUpdate: (ids: number[], changes: { review_state?: ReviewState; topic?: string; kind?: string }) => request<{ updated: number }>('/api/cards/bulk-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, ...changes }),
+  }),
+  bulkDelete: (ids: number[]) => request<{ deleted: number }>('/api/cards/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }),
 }
 
 export async function downloadMarkdown(topic: string): Promise<void> {

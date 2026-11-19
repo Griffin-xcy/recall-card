@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, BookOpen, Check, CheckCircle2, Clock3, Download, FileText, Inbox,
-  Layers3, LoaderCircle, Pencil, Play, Plus, Search, Settings2, ShieldCheck, Trash2, XCircle,
+  Layers3, ListChecks, LoaderCircle, Pencil, Play, Plus, Search, Settings2, ShieldCheck, Trash2, X, XCircle,
 } from 'lucide-react'
 import { api, downloadMarkdown } from '../api'
 import EditCardDialog from '../components/EditCardDialog'
@@ -40,6 +40,10 @@ export default function Home() {
   const [exporting, setExporting] = useState(false)
   const [toast, setToast] = useState('')
   const [reviewQueue, setReviewQueue] = useState<{ cards: Card[]; title: string } | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkConfirm, setBulkConfirm] = useState(false)
   const toastTimer = useRef<number | undefined>(undefined)
 
   const notify = useCallback((message: string) => {
@@ -179,6 +183,55 @@ export default function Home() {
     notify(`本轮：会了 ${summary.known} 张，再看看 ${summary.again} 张`)
   }
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+  }
+
+  const allSelected = cards.length > 0 && selectedIds.length === cards.length
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : cards.map((card) => card.id))
+  }
+
+  const exitSelect = () => {
+    setSelectMode(false)
+    setSelectedIds([])
+  }
+
+  const runBulk = async (changes: { review_state?: 'new' | 'known' | 'again'; topic?: string; kind?: string }, label: string) => {
+    if (selectedIds.length === 0) {
+      notify('先选几张卡片')
+      return
+    }
+    setBulkBusy(true)
+    try {
+      const result = await api.bulkUpdate(selectedIds, changes)
+      await Promise.all([loadCards(), refreshMeta()])
+      setSelectedIds([])
+      notify(`${label} ${result.updated} 张卡片`)
+    } catch (caught) {
+      notify(caught instanceof Error ? caught.message : '批量修改失败')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const runBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setBulkBusy(true)
+    try {
+      const result = await api.bulkDelete(selectedIds)
+      await Promise.all([loadCards(), refreshMeta()])
+      setBulkConfirm(false)
+      exitSelect()
+      notify(`已删除 ${result.deleted} 张卡片`)
+    } catch (caught) {
+      notify(caught instanceof Error ? caught.message : '批量删除失败')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const pageTitle = view === 'materials' ? '导入记录' : selectedTopic || '全部卡片'
   const pageSubtitle = view === 'materials'
     ? '每份材料的处理状态都留在这里'
@@ -217,6 +270,7 @@ export default function Home() {
           <div className="header-actions">
             <button type="button" className={`button settings-button ${health && !health.model_configured ? 'button-primary' : 'button-secondary'}`} onClick={() => setSettingsOpen(true)} title={health?.model_configured ? '模型设置' : '第一步：连接用于生成卡片的模型'}><Settings2 size={18} /><span>{health?.model_configured ? '模型设置' : '连接模型'}</span></button>
             <button type="button" className="button button-secondary review-start" onClick={() => startReview(cards, selectedTopic || '全部卡片')} disabled={stats.cards === 0} title="逐张复习，标记会了或再看看"><Play size={17} /><span>开始复习</span></button>
+            <button type="button" className={`button button-secondary bulk-toggle ${selectMode ? 'active' : ''}`} onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} disabled={stats.cards === 0} title="批量标记、改主题或类型、删除"><ListChecks size={17} /><span>{selectMode ? '退出批量' : '批量管理'}</span></button>
             <button type="button" className="button button-secondary export-button" onClick={exportCards} disabled={exporting || stats.cards === 0} title={stats.cards === 0 ? '暂无卡片可导出' : '按主题导出 Markdown ZIP'}>
               {exporting ? <LoaderCircle size={17} className="spin" /> : <Download size={17} />}<span>导出 Markdown</span>
             </button>
@@ -276,8 +330,9 @@ export default function Home() {
                             </header>
                             <div className="card-grid">
                               {group.cards.map((card) => (
-                                <article className="study-card" key={card.id}>
-                                  <div className="card-topline"><span className={`kind-badge kind-${(Math.max(config.kinds.indexOf(card.kind), 0) % 4) + 1}`}>{card.kind}</span><span className="card-topic">{card.topic}</span>{card.review_state === 'known' && <span className="review-badge known">已掌握</span>}{card.review_state === 'again' && <span className="review-badge again">再看看</span>}<div className="card-tools"><button type="button" className="icon-button" onClick={() => setEditing(card)} aria-label={`编辑 ${card.title}`}><Pencil size={16} /></button><button type="button" className="icon-button delete-tool" onClick={() => setDeleting(card)} aria-label={`删除 ${card.title}`}><Trash2 size={16} /></button></div></div>
+                                <article className={`study-card ${selectMode ? 'selectable' : ''} ${selectedIds.includes(card.id) ? 'selected' : ''}`} key={card.id} onClick={selectMode ? () => toggleSelect(card.id) : undefined}>
+                                  {selectMode && <span className="bulk-check" aria-hidden>{selectedIds.includes(card.id) && <Check size={13} />}</span>}
+                                  <div className="card-topline"><span className={`kind-badge kind-${(Math.max(config.kinds.indexOf(card.kind), 0) % 4) + 1}`}>{card.kind}</span><span className="card-topic">{card.topic}</span>{card.review_state === 'known' && <span className="review-badge known">已掌握</span>}{card.review_state === 'again' && <span className="review-badge again">再看看</span>}{!selectMode && <div className="card-tools"><button type="button" className="icon-button" onClick={() => setEditing(card)} aria-label={`编辑 ${card.title}`}><Pencil size={16} /></button><button type="button" className="icon-button delete-tool" onClick={() => setDeleting(card)} aria-label={`删除 ${card.title}`}><Trash2 size={16} /></button></div>}</div>
                                   <h2>{card.title}</h2>
                                   {card.question && <p className="card-question">{card.question}</p>}
                                   <p className="card-answer">{card.answer}</p>
@@ -305,6 +360,36 @@ export default function Home() {
       {settingsOpen && <SettingsDialog health={health} topics={config.topics} kinds={config.kinds} onClose={() => setSettingsOpen(false)} onSaved={(updated) => { setHealth(updated); setSettingsOpen(false); notify('模型设置已保存，可以开始生成') }} onConfigSaved={() => void refreshMeta()} />}
       {editing && <EditCardDialog card={editing} topics={config.topics} kinds={config.kinds} onClose={() => setEditing(null)} onSaved={(card) => void saved(card)} />}
       {deleting && <Modal title="删除这张卡片？" description="删除后无法恢复，原始导入材料仍会保留。" onClose={() => setDeleting(null)}><div className="delete-preview"><strong>{deleting.title}</strong><span>{deleting.topic} · {deleting.kind}</span></div><div className="modal-actions"><button type="button" className="button button-ghost" onClick={() => setDeleting(null)} disabled={deleteBusy}>取消</button><button type="button" className="button button-danger" onClick={() => void remove()} disabled={deleteBusy}>{deleteBusy ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />}确认删除</button></div></Modal>}
+      {selectMode && (
+        <div className="bulk-bar" role="toolbar" aria-label="批量操作">
+          <button type="button" className="bulk-select-all" onClick={toggleSelectAll}>{allSelected ? '取消全选' : '全选本页'}</button>
+          <span className="bulk-count">已选 {selectedIds.length} 张</span>
+          <div className="bulk-actions">
+            <button type="button" className="button bulk-action" onClick={() => void runBulk({ review_state: 'known' }, '已标记为会了')} disabled={bulkBusy || selectedIds.length === 0}><Check size={15} />会了</button>
+            <button type="button" className="button bulk-action" onClick={() => void runBulk({ review_state: 'again' }, '已标记为再看看')} disabled={bulkBusy || selectedIds.length === 0}>再看看</button>
+            <button type="button" className="button bulk-action" onClick={() => void runBulk({ review_state: 'new' }, '已重置为未复习')} disabled={bulkBusy || selectedIds.length === 0}>重置</button>
+            <select aria-label="批量修改主题" value="" disabled={bulkBusy || selectedIds.length === 0} onChange={(event) => { const value = event.target.value; if (value) void runBulk({ topic: value }, `已改到主题「${value}」`) }}>
+              <option value="">改主题…</option>
+              {config.topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+            </select>
+            <select aria-label="批量修改类型" value="" disabled={bulkBusy || selectedIds.length === 0} onChange={(event) => { const value = event.target.value; if (value) void runBulk({ kind: value }, `已改为类型「${value}」`) }}>
+              <option value="">改类型…</option>
+              {config.kinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+            </select>
+            <button type="button" className="button bulk-action bulk-danger" onClick={() => setBulkConfirm(true)} disabled={bulkBusy || selectedIds.length === 0}><Trash2 size={15} />删除</button>
+            <button type="button" className="button bulk-action" onClick={exitSelect} disabled={bulkBusy}><X size={15} />退出</button>
+          </div>
+        </div>
+      )}
+      {bulkConfirm && (
+        <Modal title={`删除 ${selectedIds.length} 张卡片？`} description="删除后无法恢复，原始导入材料仍会保留。" onClose={() => setBulkConfirm(false)}>
+          <div className="bulk-confirm-note">确认删除选中的 {selectedIds.length} 张卡片</div>
+          <div className="modal-actions">
+            <button type="button" className="button button-ghost" onClick={() => setBulkConfirm(false)} disabled={bulkBusy}>取消</button>
+            <button type="button" className="button button-danger" onClick={() => void runBulkDelete()} disabled={bulkBusy}>{bulkBusy ? <LoaderCircle size={17} className="spin" /> : <Check size={17} />}确认删除</button>
+          </div>
+        </Modal>
+      )}
       {reviewQueue && <ReviewDialog cards={reviewQueue.cards} title={reviewQueue.title} onClose={() => setReviewQueue(null)} onReviewed={reviewed} onFinish={finishedReview} />}
       {toast && <div className="toast" role="status"><CheckCircle2 size={18} />{toast}</div>}
     </div>
