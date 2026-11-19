@@ -1,5 +1,6 @@
 """生成打包用的应用图标 build/icon.ico（不依赖外部素材）。"""
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -39,6 +40,11 @@ def build() -> Image.Image:
 
 
 def main() -> None:
+    # GitHub 的 Windows 运行器控制台默认是 cp1252，直接打印中文会 UnicodeEncodeError
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     image = build()
     sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]

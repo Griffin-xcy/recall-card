@@ -12,6 +12,10 @@ permissions:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
+    env:
+      # Windows 运行器控制台默认 cp1252，脚本里打印中文会 UnicodeEncodeError
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
 
