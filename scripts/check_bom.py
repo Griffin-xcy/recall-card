@@ -40,6 +40,10 @@ def candidates():
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     bad = sorted({str(path) for path in candidates() if path.read_bytes()[:3] == BOM})
     if bad:
         print("发现带 UTF-8 BOM 的文件：")

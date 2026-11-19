@@ -32,6 +32,9 @@ jobs:
   # 只在 ubuntu 上测会让问题漏到发布流程里。
   windows:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
