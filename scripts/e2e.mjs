@@ -222,6 +222,14 @@ try {
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
+  // 先等后台重新处理全部结束，再刷新页面，避免拿到会被替换的卡片 id
+  await expect.poll(async () => page.evaluate(async () => {
+    const response = await fetch('/api/materials')
+    const materials = await response.json()
+    return materials.filter((material) => material.status === 'processing').length
+  }), { timeout: 20000 }).toBe(0)
+  await page.reload({ waitUntil: 'networkidle' })
+
   // 复习流程：翻面看答案、标记会了，进度和后台状态都要跟着走
   // 先等提示条消失，避免它盖在复习面板底部的按钮上
   await expect(page.locator('.toast')).toHaveCount(0, { timeout: 10000 })

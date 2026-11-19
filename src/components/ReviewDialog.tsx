@@ -9,9 +9,11 @@ interface Props {
   onClose: () => void
   onReviewed: (card: Card) => void
   onFinish: (summary: { known: number; again: number }) => void
+  // 卡片可能因为后台重新生成而不存在了，这时要刷新外部列表
+  onStale: () => void
 }
 
-export default function ReviewDialog({ cards, title, onClose, onReviewed, onFinish }: Props) {
+export default function ReviewDialog({ cards, title, onClose, onReviewed, onFinish, onStale }: Props) {
   const queue = useMemo(() => cards.filter((card) => card.review_state !== 'known'), [cards])
   const [index, setIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
@@ -41,11 +43,18 @@ export default function ReviewDialog({ cards, title, onClose, onReviewed, onFini
       else setAgain((value) => value + 1)
       advance()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '保存失败')
+      const message = caught instanceof Error ? caught.message : '保存失败'
+      // 卡片被重新生成后 id 会变，这时提示用户刷新，别让人以为是程序坏了
+      if (message.includes('不存在')) {
+        onStale()
+        setError('这张卡片已经被重新生成，列表已刷新，请重新开始复习')
+      } else {
+        setError(message)
+      }
     } finally {
       setBusy(false)
     }
-  }, [advance, busy, current, onReviewed])
+  }, [advance, busy, current, onReviewed, onStale])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

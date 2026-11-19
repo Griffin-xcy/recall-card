@@ -538,7 +538,7 @@ export default function Home() {
           </div>
         </Modal>
       )}
-      {reviewQueue && <ReviewDialog cards={reviewQueue.cards} title={reviewQueue.title} onClose={() => setReviewQueue(null)} onReviewed={reviewed} onFinish={finishedReview} />}
+      {reviewQueue && <ReviewDialog cards={reviewQueue.cards} title={reviewQueue.title} onClose={() => setReviewQueue(null)} onReviewed={reviewed} onFinish={finishedReview} onStale={() => { void loadCards(); void refreshMeta() }} />}
       {toast && <div className="toast" role="status"><CheckCircle2 size={18} />{toast}</div>}
     </div>
   )
