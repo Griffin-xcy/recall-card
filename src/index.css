@@ -429,3 +429,6 @@ input::placeholder, textarea::placeholder { color: var(--ink-muted); }
   .due-banner { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
   .due-action { width: 100%; justify-content: center; }
 }
+
+.kind-5 { background: oklch(0.94 0.04 20); color: oklch(0.45 0.1 25); }
+.kind-1 { background: oklch(0.94 0.04 160); color: oklch(0.4 0.07 160); }

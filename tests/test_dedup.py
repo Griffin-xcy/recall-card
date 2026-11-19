@@ -62,7 +62,7 @@ def test_cross_material_card_dedup(client):
     assert wait_completed(client, second.json()["material"]["id"]) == "completed"
     cards = client.get("/api/cards").json()
     second_cards = [card for card in cards if card["material_id"] == second.json()["material"]["id"]]
-    assert [card["kind"] for card in second_cards] == ["知识点"]
+    assert [card["kind"] for card in second_cards] == ["概念"]
     assert len(cards) == 4
 
 
@@ -94,8 +94,8 @@ def test_failed_file_can_be_reimported(client, monkeypatch):
 def test_card_edit_duplicate_returns_error(client):
     _ingest_text(client)
     cards = client.get("/api/cards").json()
-    qa = next(card for card in cards if card["kind"] == "问答")
-    other = next(card for card in cards if card["kind"] != "问答")
+    qa = next(card for card in cards if card["kind"] == "操作")
+    other = next(card for card in cards if card["kind"] != "操作")
     response = client.patch(f"/api/cards/{other['id']}", json={"question": qa["question"]})
     assert response.status_code == 422
     assert "相同" in response.json()["detail"]

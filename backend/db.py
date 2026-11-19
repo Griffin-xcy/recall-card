@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import CARD_KINDS, TOPICS
+from .config import CARD_KINDS, KIND_MIGRATION, LEGACY_CARD_KINDS, TOPICS
 
 
 SCHEMA_VERSION = 2
@@ -84,6 +84,12 @@ class Database:
                 "INSERT OR IGNORE INTO topics(name, created_at) VALUES (?, ?)",
                 [(topic, utc_now()) for topic in TOPICS],
             )
+            # 旧版本的办公类分类换成学习类分类；用户自己加过类别就不动
+            existing_kinds = {row["name"] for row in connection.execute("SELECT name FROM card_kinds")}
+            if existing_kinds & set(LEGACY_CARD_KINDS) and not existing_kinds & set(CARD_KINDS):
+                connection.execute("DELETE FROM card_kinds")
+                for old_kind, new_kind in KIND_MIGRATION.items():
+                    connection.execute("UPDATE cards SET kind = ? WHERE kind = ?", (new_kind, old_kind))
             connection.executemany(
                 "INSERT OR IGNORE INTO card_kinds(name, created_at) VALUES (?, ?)",
                 [(kind, utc_now()) for kind in CARD_KINDS],

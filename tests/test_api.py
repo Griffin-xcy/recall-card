@@ -29,7 +29,7 @@ def test_text_ingestion_generates_cards(client):
     assert material["status"] == "completed"
     cards = client.get("/api/cards").json()
     assert len(cards) >= 3
-    assert {card["kind"] for card in cards} >= {"知识点", "问答"}
+    assert {card["kind"] for card in cards} >= {"概念", "操作"}
     assert client.get("/api/stats").json()["cards"] == len(cards)
     assert client.get("/api/topics").json()[0]["count"] >= 1
 

@@ -119,7 +119,7 @@ try {
   await page.screenshot({ path: path.join(artifacts, 'desktop-cards.png'), fullPage: true })
 
   // 按类型定位再编辑，不依赖卡片在页面上的先后顺序
-  await page.getByRole('button', { name: '知识点', exact: true }).click()
+  await page.getByRole('button', { name: '概念', exact: true }).click()
   await expect(page.locator('.study-card')).toHaveCount(1)
   await page.locator('.study-card').first().getByRole('button', { name: /^编辑/ }).click()
   await page.getByLabel('标题', { exact: true }).fill('间隔重复（已编辑）')
@@ -131,7 +131,7 @@ try {
   await expect(page.getByText('没有找到匹配的卡片')).toBeVisible()
   await page.getByRole('button', { name: '清除筛选' }).click()
   await expect(page.locator('.study-card')).toHaveCount(3)
-  await page.getByRole('button', { name: '问答', exact: true }).click()
+  await page.getByRole('button', { name: '操作', exact: true }).click()
   await expect(page.locator('.study-card')).toHaveCount(1)
   await page.getByRole('button', { name: '全部类型' }).click()
   await expect(page.locator('.study-card')).toHaveCount(3)
@@ -143,7 +143,7 @@ try {
   await download.saveAs(path.join(artifacts, 'export.zip'))
 
   // 删掉问答卡。用类型筛选定位，避免依赖卡片在页面上的先后顺序。
-  await page.getByRole('button', { name: '问答', exact: true }).click()
+  await page.getByRole('button', { name: '操作', exact: true }).click()
   await expect(page.locator('.study-card')).toHaveCount(1)
   await page.locator('.study-card').first().getByRole('button', { name: /^删除/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()

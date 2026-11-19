@@ -29,7 +29,7 @@ class ModelSettingsInput(BaseModel):
 
 class GeneratedCard(BaseModel):
     topic: str = "其他"
-    kind: str = "知识点"
+    kind: str = "概念"
     title: str
     question: str = ""
     answer: str

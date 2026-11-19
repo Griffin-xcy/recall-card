@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from .config import Settings
+from .config import KIND_GUIDE, Settings
 from .schemas import GeneratedCard
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,16 @@ class LLMError(RuntimeError):
 
 
 def build_system_prompt(topics: list[str], kinds: list[str]) -> str:
+    guide = "；".join(f"{name}={desc}" for name, desc in KIND_GUIDE.items() if name in kinds)
+    fallback = kinds[0] if kinds else "概念"
+    kind_rule = f"判断依据：{guide}。都套不上时用「{fallback}」，不要硬凑。" if guide else ""
     return f"""你是信息整理助手。把材料转成适合长期复习的卡片，不写空泛总结。
 只输出 JSON 对象，格式为 {{"cards": [...]}}。每张卡片包含：
 - topic：必须从 {topics} 中选择；
-- kind：必须从 {kinds} 中选择；
+- kind：必须从 {kinds} 中选择。{kind_rule}
 - title：不超过 30 字的明确主题；
-- question：问答卡填写具体问题，其他卡可留空；
-- answer：准确保留材料中的事实、条件、结论或行动，不补充材料外知识；
+- question：能问成具体问题的写成问答，其他卡可留空；
+- answer：准确保留材料中的事实、条件、结论或操作，不补充材料外知识；
 - tags：1 到 4 个简短标签。
 优先提炼有信息量的内容，合并重复项。没有合适内容时返回空数组。"""
 
@@ -48,9 +51,9 @@ def mock_cards(text: str) -> list[dict[str, Any]]:
     primary = sentences[0][:500]
     detail = sentences[1][:500] if len(sentences) > 1 else primary
     return [
-        {"topic": "学习笔记", "kind": "知识点", "title": primary[:28], "question": "", "answer": primary, "tags": ["核心概念"]},
-        {"topic": "学习笔记", "kind": "问答", "title": "关键内容回顾", "question": "这份材料强调了什么关键内容？", "answer": detail, "tags": ["复习"]},
-        {"topic": "工作会议", "kind": "行动项", "title": "后续行动", "question": "", "answer": f"回顾并确认：{detail}", "tags": ["待办"]},
+        {"topic": "学习笔记", "kind": "概念", "title": primary[:28], "question": "", "answer": primary, "tags": ["核心概念"]},
+        {"topic": "学习笔记", "kind": "操作", "title": "关键内容回顾", "question": "这份材料强调了什么关键内容？", "answer": detail, "tags": ["复习"]},
+        {"topic": "学习笔记", "kind": "易错点", "title": "后续行动", "question": "", "answer": f"回顾并确认：{detail}", "tags": ["待办"]},
     ]
 
 
@@ -103,7 +106,7 @@ async def generate_cards(text: str, source_title: str, settings: Settings, topic
             if raw.get("topic") not in topics:
                 raw["topic"] = "其他" if "其他" in topics else (topics[0] if topics else "其他")
             if raw.get("kind") not in kinds:
-                raw["kind"] = kinds[0] if kinds else "知识点"
+                raw["kind"] = kinds[0] if kinds else "概念"
             cards.append(GeneratedCard.model_validate(raw))
         except (ValueError, TypeError):
             continue
