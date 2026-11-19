@@ -13,7 +13,7 @@ from .demo import seed_demo
 from .export import build_markdown_zip
 from .extractor import ExtractionError, extract_pdf, extract_text, extract_webpage
 from .pipeline import process_material
-from .schemas import CardUpdate, KindInput, ModelSettingsInput, TextMaterialInput, TopicInput, UrlMaterialInput
+from .schemas import CardUpdate, KindInput, ModelSettingsInput, ReviewInput, TextMaterialInput, TopicInput, UrlMaterialInput
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("recall-card")
@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
                 logger.info("首次启动，已写入示例卡片")
         except Exception:  # 示例卡片失败不能影响正常启动
             logger.exception("写入示例卡片失败")
-    application = FastAPI(title="拾记 Recall Card", version="0.1.1")
+    application = FastAPI(title="拾记 Recall Card", version="0.2.0")
 
     async def regenerate_safely(material_id: int) -> list[dict]:
         """重新生成卡片；失败时回滚到原卡片，避免数据丢失。"""
@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
     def health() -> dict:
         return {
             "status": "ok",
-            "version": "0.1.1",
+            "version": "0.2.0",
             "model_configured": settings.model_configured,
             "has_api_key": bool(settings.api_key),
             "provider": settings.llm_provider,
@@ -206,6 +206,13 @@ def create_app() -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
         return Response(status_code=204)
+
+    @application.post("/api/cards/{card_id}/review")
+    def review_card(card_id: int, payload: ReviewInput) -> dict:
+        try:
+            return db.set_review_state(card_id, payload.state)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     @application.get("/api/materials/{material_id}")
     def get_material(material_id: int) -> dict:

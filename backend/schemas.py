@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -40,3 +42,7 @@ class TopicInput(BaseModel):
 
 class KindInput(BaseModel):
     name: str = Field(min_length=1, max_length=30)
+
+
+class ReviewInput(BaseModel):
+    state: Literal["new", "known", "again"]

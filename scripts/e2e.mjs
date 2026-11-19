@@ -138,9 +138,13 @@ try {
   expect(download.suggestedFilename()).toMatch(/\.zip$/)
   await download.saveAs(path.join(artifacts, 'export.zip'))
 
+  // 删掉问答卡。用类型筛选定位，避免依赖卡片在页面上的先后顺序。
+  await page.getByRole('button', { name: '问答', exact: true }).click()
+  await expect(page.locator('.study-card')).toHaveCount(1)
   await page.locator('.study-card').first().getByRole('button', { name: /^删除/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('button', { name: '确认删除' }).click()
+  await page.getByRole('button', { name: '全部类型' }).click()
   await expect(page.locator('.study-card')).toHaveCount(2)
 
   await page.route('**/api/materials/file', async (route) => {
@@ -213,6 +217,25 @@ try {
   await expect(page.getByLabel('API Key', { exact: true })).toHaveAttribute('placeholder', '留空则保留已保存的 Key')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // 复习流程：翻面看答案、标记会了，进度和后台状态都要跟着走
+  await page.getByRole('button', { name: /开始复习/ }).click()
+  await expect(page.locator('.review-panel')).toBeVisible()
+  await expect(page.locator('.review-progress-text')).toHaveText('1 / 6')
+  await expect(page.locator('.review-answer')).toHaveCount(0)
+  await page.getByRole('button', { name: /显示答案/ }).click()
+  await expect(page.locator('.review-answer')).toBeVisible()
+  await page.screenshot({ path: path.join(artifacts, 'desktop-review.png'), fullPage: true })
+  await page.getByRole('button', { name: /^会了/ }).click()
+  await expect(page.locator('.review-progress-text')).toHaveText('2 / 6')
+  await page.locator('.review-header .icon-button').click()
+  await expect(page.locator('.review-panel')).toHaveCount(0)
+  const knownCards = await page.evaluate(async () => {
+    const response = await fetch('/api/cards')
+    return (await response.json()).filter((card) => card.review_state === 'known').length
+  })
+  expect(knownCards).toBe(1)
+  await expect(page.locator('.review-badge.known').first()).toBeVisible()
 
   const mobile = await browser.newContext({ viewport: { width: 375, height: 812 } })
   const mobilePage = await mobile.newPage()

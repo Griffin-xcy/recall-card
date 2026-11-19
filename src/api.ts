@@ -1,4 +1,4 @@
-import type { Card, CardChanges, Config, Health, Material, Stats, TopicCount } from './types'
+import type { Card, CardChanges, Config, Health, Material, ReviewState, Stats, TopicCount } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options)
@@ -73,6 +73,11 @@ export const api = {
     body: JSON.stringify(changes),
   }),
   deleteCard: (id: number) => request<void>(`/api/cards/${id}`, { method: 'DELETE' }),
+  reviewCard: (id: number, state: ReviewState) => request<Card>(`/api/cards/${id}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state }),
+  }),
 }
 
 export async function downloadMarkdown(topic: string): Promise<void> {

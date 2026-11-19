@@ -9,7 +9,7 @@ from typing import Any
 from .config import CARD_KINDS, TOPICS
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utc_now() -> str:
@@ -62,7 +62,9 @@ class Database:
                     answer TEXT NOT NULL,
                     tags TEXT NOT NULL DEFAULT '[]',
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    review_state TEXT NOT NULL DEFAULT 'new',
+                    reviewed_at TEXT NOT NULL DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS app_settings (
                     key TEXT PRIMARY KEY,
@@ -92,6 +94,10 @@ class Database:
             card_columns = {row["name"] for row in connection.execute("PRAGMA table_info(cards)")}
             if "fingerprint" not in card_columns:
                 connection.execute("ALTER TABLE cards ADD COLUMN fingerprint TEXT NOT NULL DEFAULT ''")
+            if "review_state" not in card_columns:
+                connection.execute("ALTER TABLE cards ADD COLUMN review_state TEXT NOT NULL DEFAULT 'new'")
+            if "reviewed_at" not in card_columns:
+                connection.execute("ALTER TABLE cards ADD COLUMN reviewed_at TEXT NOT NULL DEFAULT ''")
 
             materials = connection.execute("SELECT id, content FROM materials WHERE content_hash = ''").fetchall()
             connection.executemany(
@@ -323,7 +329,30 @@ class Database:
             cards = connection.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
             materials = connection.execute("SELECT COUNT(*) FROM materials").fetchone()[0]
             topics = connection.execute("SELECT COUNT(DISTINCT topic) FROM cards").fetchone()[0]
-        return {"cards": cards, "materials": materials, "topics": topics}
+            counts = {
+                row["review_state"]: row["count"]
+                for row in connection.execute(
+                    "SELECT review_state, COUNT(*) AS count FROM cards GROUP BY review_state"
+                ).fetchall()
+            }
+        return {
+            "cards": cards,
+            "materials": materials,
+            "topics": topics,
+            "reviewed_cards": counts.get("known", 0) + counts.get("again", 0),
+            "known_cards": counts.get("known", 0),
+            "again_cards": counts.get("again", 0),
+        }
+
+    def set_review_state(self, card_id: int, state: str) -> dict[str, Any]:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE cards SET review_state = ?, reviewed_at = ? WHERE id = ?",
+                (state, utc_now() if state != "new" else "", card_id),
+            )
+            if cursor.rowcount == 0:
+                raise KeyError(f"卡片 {card_id} 不存在")
+        return self.get_card(card_id)
 
     def list_topics(self) -> list[str]:
         with self.connect() as connection:

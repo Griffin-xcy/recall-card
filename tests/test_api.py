@@ -19,7 +19,9 @@ def test_health_and_empty_state(client):
     assert health.status_code == 200
     assert health.json()["model_configured"] is True
     assert client.get("/api/cards").json() == []
-    assert client.get("/api/stats").json() == {"cards": 0, "materials": 0, "topics": 0}
+    stats = client.get("/api/stats").json()
+    assert (stats["cards"], stats["materials"], stats["topics"]) == (0, 0, 0)
+    assert stats["known_cards"] == 0 and stats["again_cards"] == 0
 
 
 def test_text_ingestion_generates_cards(client):
@@ -150,3 +152,26 @@ def test_model_settings_save_without_echo_and_persist(client):
 def test_model_settings_reject_invalid_url(client):
     response = client.put("/api/settings", json={"base_url": "not-a-url", "api_key": "key", "model": "model"})
     assert response.status_code == 422
+
+
+def test_review_state_roundtrip(client):
+    material = ingest_text(client)
+    assert material["status"] == "completed"
+    card_id = client.get("/api/cards").json()[0]["id"]
+
+    known = client.post(f"/api/cards/{card_id}/review", json={"state": "known"})
+    assert known.status_code == 200
+    assert known.json()["review_state"] == "known"
+    assert known.json()["reviewed_at"], "标记后应该有复习时间"
+
+    again = client.post(f"/api/cards/{card_id}/review", json={"state": "again"}).json()
+    assert again["review_state"] == "again"
+    assert client.get("/api/stats").json()["again_cards"] == 1
+
+    reset = client.post(f"/api/cards/{card_id}/review", json={"state": "new"}).json()
+    assert reset["review_state"] == "new"
+    assert reset["reviewed_at"] == ""
+    assert client.get("/api/stats").json()["reviewed_cards"] == 0
+
+    assert client.post("/api/cards/999999/review", json={"state": "known"}).status_code == 404
+    assert client.post(f"/api/cards/{card_id}/review", json={"state": "unknown"}).status_code == 422

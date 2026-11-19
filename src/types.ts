@@ -1,4 +1,5 @@
 export type CardKind = string
+export type ReviewState = 'new' | 'known' | 'again'
 
 export interface Config {
   topics: string[]
@@ -15,6 +16,8 @@ export interface Card {
   question: string
   answer: string
   tags: string[]
+  review_state: ReviewState
+  reviewed_at: string
   created_at: string
   updated_at: string
 }
@@ -28,6 +31,9 @@ export interface Stats {
   cards: number
   materials: number
   topics: number
+  reviewed_cards: number
+  known_cards: number
+  again_cards: number
 }
 
 export interface Material {
