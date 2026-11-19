@@ -47,7 +47,7 @@ export default function EditCardDialog({ card, topics, kinds, onClose, onSaved }
           <label>主题<input list="topic-options" value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={60} disabled={busy} /><datalist id="topic-options">{topics.map((item) => <option key={item}>{item}</option>)}</datalist></label>
         </div>
         <label>标题<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} disabled={busy} /></label>
-        <label>问题（问答卡建议填写）<textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={2} disabled={busy} placeholder="例如：什么是主动回忆？" /></label>
+        <label>问题（能问成具体问题的卡片填这里）<textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={2} disabled={busy} placeholder="例如：什么是主动回忆？" /></label>
         <label>卡片内容<textarea value={answer} onChange={(event) => setAnswer(event.target.value)} rows={7} disabled={busy} /></label>
         <label>标签<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="用逗号分隔，例如：学习，记忆" disabled={busy} /></label>
         {error && <div className="form-error" role="alert">{error}</div>}

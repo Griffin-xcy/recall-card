@@ -84,16 +84,19 @@ class Database:
                 "INSERT OR IGNORE INTO topics(name, created_at) VALUES (?, ?)",
                 [(topic, utc_now()) for topic in TOPICS],
             )
-            # 旧版本的办公类分类换成学习类分类；用户自己加过类别就不动
+            # 旧版本的办公类分类换成学习类分类。
+            # 只有类别恰好还是旧默认那四项时才自动迁移，用户自己配过就不碰。
             existing_kinds = {row["name"] for row in connection.execute("SELECT name FROM card_kinds")}
-            if existing_kinds & set(LEGACY_CARD_KINDS) and not existing_kinds & set(CARD_KINDS):
+            if existing_kinds == set(LEGACY_CARD_KINDS):
                 connection.execute("DELETE FROM card_kinds")
                 for old_kind, new_kind in KIND_MIGRATION.items():
                     connection.execute("UPDATE cards SET kind = ? WHERE kind = ?", (new_kind, old_kind))
-            connection.executemany(
-                "INSERT OR IGNORE INTO card_kinds(name, created_at) VALUES (?, ?)",
-                [(kind, utc_now()) for kind in CARD_KINDS],
-            )
+                existing_kinds = set()
+            if not existing_kinds:
+                connection.executemany(
+                    "INSERT OR IGNORE INTO card_kinds(name, created_at) VALUES (?, ?)",
+                    [(kind, utc_now()) for kind in CARD_KINDS],
+                )
             material_columns = {row["name"] for row in connection.execute("PRAGMA table_info(materials)")}
             if "content_hash" not in material_columns:
                 connection.execute("ALTER TABLE materials ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
