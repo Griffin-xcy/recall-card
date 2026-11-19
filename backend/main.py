@@ -52,7 +52,7 @@ def create_app() -> FastAPI:
                 logger.info("首次启动，已写入示例卡片")
         except Exception:  # 示例卡片失败不能影响正常启动
             logger.exception("写入示例卡片失败")
-    application = FastAPI(title="拾记 Recall Card", version="0.4.0")
+    application = FastAPI(title="拾记 Recall Card", version="0.5.0")
 
     async def regenerate_safely(material_id: int) -> list[dict]:
         """重新生成卡片；失败时回滚到原卡片，避免数据丢失。"""
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     def health() -> dict:
         return {
             "status": "ok",
-            "version": "0.4.0",
+            "version": "0.5.0",
             "model_configured": settings.model_configured,
             "has_api_key": bool(settings.api_key),
             "provider": settings.llm_provider,
@@ -223,6 +223,10 @@ def create_app() -> FastAPI:
             return db.set_review_state(card_id, payload.state)
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
+
+    @application.get("/api/review/queue")
+    def review_queue(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+        return db.review_queue(limit)
 
     @application.post("/api/cards/bulk-update")
     def bulk_update_cards(payload: BulkUpdateInput) -> dict:

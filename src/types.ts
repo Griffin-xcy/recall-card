@@ -36,6 +36,13 @@ export interface Stats {
   again_cards: number
 }
 
+export interface ReviewQueue {
+  cards: Card[]
+  total: number
+  again: number
+  limit: number
+}
+
 export interface Material {
   id: number
   title: string

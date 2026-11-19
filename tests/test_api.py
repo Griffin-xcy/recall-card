@@ -215,3 +215,28 @@ def test_cards_filter_by_review_state(client):
     kind = client.get("/api/cards?state=known").json()[0]["kind"]
     filtered = client.get(f"/api/cards?state=known&kind={kind}").json()
     assert filtered and all(card["kind"] == kind for card in filtered)
+
+
+def test_review_queue_prioritizes_again_and_skips_known(client):
+    ingest_text(client)
+    ids = [card["id"] for card in client.get("/api/cards").json()]
+    assert len(ids) >= 3
+
+    queue = client.get("/api/review/queue").json()
+    assert queue["total"] == len(ids)
+    assert len(queue["cards"]) == len(ids)
+    assert all(card["review_state"] != "known" for card in queue["cards"])
+
+    client.post("/api/cards/bulk-update", json={"ids": ids[:1], "review_state": "known"})
+    client.post("/api/cards/bulk-update", json={"ids": ids[-1:], "review_state": "again"})
+
+    queue = client.get("/api/review/queue").json()
+    assert queue["total"] == len(ids) - 1
+    assert queue["again"] == 1
+    assert queue["cards"][0]["id"] == ids[-1], "再看看的卡片应该排在队列最前面"
+    assert ids[0] not in {card["id"] for card in queue["cards"]}, "已掌握的不进队列"
+
+    limited = client.get("/api/review/queue?limit=2").json()
+    assert len(limited["cards"]) == 2
+    assert limited["total"] == len(ids) - 1, "limit 只影响返回条数，不影响总数"
+    assert client.get("/api/review/queue?limit=0").status_code == 422

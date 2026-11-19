@@ -1,4 +1,4 @@
-import type { Card, CardChanges, Config, Health, Material, ReviewState, Stats, TopicCount } from './types'
+import type { Card, CardChanges, Config, Health, Material, ReviewQueue, ReviewState, Stats, TopicCount } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options)
@@ -25,6 +25,7 @@ export const api = {
     body: JSON.stringify({ base_url, api_key, model }),
   }),
   stats: () => request<Stats>('/api/stats'),
+  reviewQueue: (limit = 20) => request<ReviewQueue>(`/api/review/queue?limit=${limit}`),
   topics: () => request<TopicCount[]>('/api/topics'),
   config: () => request<Config>('/api/config'),
   addTopic: (name: string) => request<{ topics: string[] }>('/api/config/topics', {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft, BookOpen, Check, CheckCircle2, Clock3, Download, FileText, Inbox,
+  AlarmClock, ArrowLeft, BookOpen, Check, CheckCircle2, Clock3, Download, FileText, Inbox,
   Layers3, ListChecks, LoaderCircle, Pencil, Play, Plus, Search, Settings2, ShieldCheck, Trash2, X, XCircle,
 } from 'lucide-react'
 import { api, downloadMarkdown } from '../api'
@@ -9,7 +9,7 @@ import ImportDialog from '../components/ImportDialog'
 import Modal from '../components/Modal'
 import ReviewDialog from '../components/ReviewDialog'
 import SettingsDialog from '../components/SettingsDialog'
-import type { Card, Config, Health, Material, Stats, TopicCount } from '../types'
+import type { Card, Config, Health, Material, ReviewQueue, Stats, TopicCount } from '../types'
 
 const emptyStats: Stats = { cards: 0, materials: 0, topics: 0, reviewed_cards: 0, known_cards: 0, again_cards: 0 }
 const PAGE_SIZE = 24
@@ -39,6 +39,7 @@ export default function Home() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [stats, setStats] = useState<Stats>(emptyStats)
   const [health, setHealth] = useState<Health | null>(null)
+  const [queue, setQueue] = useState<ReviewQueue>({ cards: [], total: 0, again: 0, limit: 20 })
   const [config, setConfig] = useState<Config>({ topics: [], kinds: [] })
   const [selectedTopic, setSelectedTopic] = useState('')
   const [selectedKind, setSelectedKind] = useState('')
@@ -73,14 +74,15 @@ export default function Home() {
 
   const refreshMeta = useCallback(async () => {
     try {
-      const [nextStats, nextTopics, nextMaterials, nextHealth, nextConfig] = await Promise.all([
-        api.stats(), api.topics(), api.materials(), api.health(), api.config(),
+      const [nextStats, nextTopics, nextMaterials, nextHealth, nextConfig, nextQueue] = await Promise.all([
+        api.stats(), api.topics(), api.materials(), api.health(), api.config(), api.reviewQueue(),
       ])
       setStats(nextStats)
       setTopics(nextTopics)
       setMaterials(nextMaterials)
       setHealth(nextHealth)
       setConfig(nextConfig)
+      setQueue(nextQueue)
     } catch (caught) {
       setLoadError(caught instanceof Error ? caught.message : '无法连接本地服务')
     }
@@ -245,6 +247,8 @@ export default function Home() {
 
   const finishedReview = (summary: { known: number; again: number }) => {
     setReviewQueue(null)
+    // 复习完把卡片和待复习队列都重新拉一遍，避免界面留着旧状态
+    void loadCards()
     void refreshMeta()
     notify(`本轮：会了 ${summary.known} 张，再看看 ${summary.again} 张`)
   }
@@ -313,6 +317,7 @@ export default function Home() {
         <button type="button" className="button button-primary sidebar-import" onClick={() => openImport()}><Plus size={18} />导入材料</button>
         <nav className="main-nav" aria-label="主导航">
           <button type="button" className={view === 'cards' && !selectedTopic ? 'nav-item active' : 'nav-item'} onClick={showAll}><BookOpen size={18} /><span>全部卡片</span><span className="nav-count">{stats.cards}</span></button>
+          <button type="button" className="nav-item nav-review" onClick={() => { if (queue.total === 0) { notify('今天没有待复习的卡片'); return } startReview(queue.cards, '今日复习') }}><AlarmClock size={18} /><span>今日复习</span><span className="nav-count">{queue.total}</span></button>
           <button type="button" className={view === 'materials' ? 'nav-item active' : 'nav-item'} onClick={() => setView('materials')}><FileText size={18} /><span>导入记录</span><span className="nav-count">{stats.materials}</span></button>
         </nav>
         <div className="topic-nav">
@@ -345,6 +350,25 @@ export default function Home() {
         </header>
 
         {health && !health.model_configured && <div className="setup-banner"><div><span><strong>第 1 步：连接模型</strong><span className="setup-step">第 2 步：导入材料，生成卡片</span></span><button type="button" className="setup-action" onClick={() => setSettingsOpen(true)}>连接模型</button></div><span>支持 DeepSeek、Kimi、OpenAI、通义千问、智谱和本地 Ollama</span></div>}
+
+        {view === 'cards' && stats.cards > 0 && (
+          queue.total > 0 ? (
+            <section className="due-banner">
+              <div className="due-text">
+                <strong>今天该复习 {queue.total} 张</strong>
+                <span>{queue.again > 0 ? `其中 ${queue.again} 张标了「再看看」，会优先出现` : '按建立时间从早到晚安排，标记「会了」之后自动移出队列'}</span>
+              </div>
+              <button type="button" className="button button-primary due-action" onClick={() => startReview(queue.cards, '今日复习')}><Play size={17} />开始今日复习</button>
+            </section>
+          ) : (
+            <section className="due-banner done">
+              <div className="due-text">
+                <strong>今天的复习都完成了</strong>
+                <span>想多练一会儿，可以从下面的分组里挑一份材料再过一遍</span>
+              </div>
+            </section>
+          )
+        )}
 
         <section className="stats-strip" aria-label="内容统计">
           <div><strong>{stats.cards}</strong><span>张卡片</span></div>

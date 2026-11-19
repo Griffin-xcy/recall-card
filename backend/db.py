@@ -384,6 +384,38 @@ class Database:
             cursor = connection.execute(f"DELETE FROM cards WHERE id IN ({placeholders})", card_ids)
             return cursor.rowcount
 
+    def review_queue(self, limit: int = 20) -> dict[str, Any]:
+        """今天该复习的卡片。
+
+        优先级：
+        1. 标过「再看看」的，越久没复习越靠前；
+        2. 从没复习过的，越早建的越靠前。
+        已经掌握的不再进入队列。
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT c.*, m.title AS material_title FROM cards c
+                   JOIN materials m ON m.id = c.material_id
+                   WHERE c.review_state <> 'known'
+                   ORDER BY CASE c.review_state WHEN 'again' THEN 0 ELSE 1 END,
+                            CASE WHEN c.reviewed_at = '' THEN '9999' ELSE c.reviewed_at END,
+                            c.id
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+            total = connection.execute(
+                "SELECT COUNT(*) FROM cards WHERE review_state <> 'known'"
+            ).fetchone()[0]
+            again = connection.execute(
+                "SELECT COUNT(*) FROM cards WHERE review_state = 'again'"
+            ).fetchone()[0]
+        return {
+            "cards": [self._card(row) for row in rows],
+            "total": total,
+            "again": again,
+            "limit": limit,
+        }
+
     def set_review_state(self, card_id: int, state: str) -> dict[str, Any]:
         with self.connect() as connection:
             cursor = connection.execute(
